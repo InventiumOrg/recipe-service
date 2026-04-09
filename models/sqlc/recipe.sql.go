@@ -7,6 +7,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 )
 
 const createRecipe = `-- name: CreateRecipe :one
@@ -19,7 +20,7 @@ INSERT INTO recipe (
 
 type CreateRecipeParams struct {
 	Name        string
-	Ingredients []string
+	Ingredients json.RawMessage
 	Cost        int32
 }
 
@@ -110,7 +111,7 @@ RETURNING id, name, ingredients, cost
 type UpdateRecipeParams struct {
 	ID          int64
 	Name        string
-	Ingredients []string
+	Ingredients json.RawMessage
 	Cost        int32
 }
 

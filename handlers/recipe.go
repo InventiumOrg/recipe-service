@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	models "recipe-service/models/sqlc"
@@ -14,6 +15,25 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+type Ingredient struct {
+	Name     string  `json:"name" binding:"required"`
+	Quantity float64 `json:"quantity" binding:"required"`
+	Measure  string  `json:"measure" binding:"required"`
+	Unit     string  `json:"unit" binding:"required"`
+}
+
+type CreateRecipeRequest struct {
+	Name        string       `json:"name" binding:"required"`
+	Ingredients []Ingredient `json:"ingredients" binding:"required"`
+	Cost        int32        `json:"cost" binding:"required"`
+}
+
+type UpdateRecipeRequest struct {
+	Name        string       `json:"name" binding:"required"`
+	Ingredients []Ingredient `json:"ingredients" binding:"required"`
+	Cost        int32        `json:"cost" binding:"required"`
+}
 
 type Handlers struct {
 	queries           *models.Queries
@@ -138,37 +158,29 @@ func (h *Handlers) CreateRecipe(ctx *gin.Context) {
 	_, span := h.tracer.Start(ctx.Request.Context(), "CreateRecipe")
 	defer span.End()
 
-	// Parse form values
-	name := ctx.PostForm("name")
-	ingredientsStr := ctx.PostFormArray("ingredients")
-	costStr := ctx.PostForm("cost")
-
-	if name == "" || len(ingredientsStr) == 0 || costStr == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing required parameters: name, ingredients, cost",
-		})
+	var req CreateRecipeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	cost, err := strconv.ParseInt(costStr, 10, 32)
+	ingredientsJSON, err := json.Marshal(req.Ingredients)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid cost",
-		})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ingredients"})
 		return
 	}
 
 	param := models.CreateRecipeParams{
-		Name:        name,
-		Ingredients: ingredientsStr,
-		Cost:        int32(cost),
+		Name:        req.Name,
+		Ingredients: json.RawMessage(ingredientsJSON),
+		Cost:        req.Cost,
 	}
 
 	// Add attributes to the span
 	span.SetAttributes(
-		attribute.String("recipe.name", name),
-		attribute.Int("recipe.cost", int(cost)),
-		attribute.Int("recipe.ingredients_count", len(ingredientsStr)),
+		attribute.String("recipe.name", req.Name),
+		attribute.Int("recipe.cost", int(req.Cost)),
+		attribute.Int("recipe.ingredients_count", len(req.Ingredients)),
 	)
 
 	dbStart := time.Now()
@@ -222,37 +234,29 @@ func (h *Handlers) UpdateRecipe(ctx *gin.Context) {
 		return
 	}
 
-	// Parse form values
-	name := ctx.PostForm("name")
-	ingredientsStr := ctx.PostFormArray("ingredients")
-	costStr := ctx.PostForm("cost")
-
-	if name == "" || len(ingredientsStr) == 0 || costStr == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing required parameters: name, ingredients, cost",
-		})
+	var req UpdateRecipeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	cost, err := strconv.ParseInt(costStr, 10, 32)
+	ingredientsJSON, err := json.Marshal(req.Ingredients)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid cost",
-		})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ingredients"})
 		return
 	}
 
 	param := models.UpdateRecipeParams{
 		ID:          id,
-		Name:        name,
-		Ingredients: ingredientsStr,
-		Cost:        int32(cost),
+		Name:        req.Name,
+		Ingredients: json.RawMessage(ingredientsJSON),
+		Cost:        req.Cost,
 	}
 
 	// Add attributes to the span
 	span.SetAttributes(
 		attribute.Int64("recipe.id", id),
-		attribute.String("recipe.name", name),
+		attribute.String("recipe.name", req.Name),
 	)
 
 	dbStart := time.Now()
