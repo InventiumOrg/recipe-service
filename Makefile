@@ -11,7 +11,7 @@ migratedown:
 sqlc:
 	sqlc generate --no-remote
 loaddata:
-	PGPASSWORD="$(DB_PASSWORD)" psql -h "$(DB_HOST)" -U "$(DB_USER)" -p 16677 -d recipe_service -f data/sql/inventium.sql
+	PGPASSWORD="$(DB_PASS)" psql -h "$(DB_HOST)" -U "$(DB_USER)" -p 16677 -d recipe_service -f data/sql/inventium.sql
 runcontainer:
 	podman run --network inventium --name recipe-service -p 9820:9820 -d -e DB_SOURCE="$(DB_SOURCE)" recipe-service:1.0.0
 .PHONY: postgres createdb dropdb migrateup migratedown sqlc loaddata runcontainer
