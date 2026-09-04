@@ -4,9 +4,13 @@
 
 package models
 
+import (
+	"encoding/json"
+)
+
 type Recipe struct {
 	ID          int64
 	Name        string
-	Ingredients []string
+	Ingredients json.RawMessage
 	Cost        int32
 }

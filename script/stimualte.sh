@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-BASE_URL="http://localhost:7162/v1/recipe"
+BASE_URL="http://localhost/v1/recipe"
 
 # Number of requests to make (default: 10)
 NUM_REQUESTS=${1:-10}
@@ -13,22 +13,13 @@ echo "Starting recipe service simulation with $NUM_REQUESTS requests..."
 echo "Delay between requests: ${DELAY}s"
 echo "----------------------------------------"
 
-# Function to create a recipe
+# Function to create a recipe (JSON)
 create_recipe() {
-    local name=$1
-    local cost=$2
-    shift 2
-    local ingredients=("$@")
-    
-    local curl_args=()
-    for ing in "${ingredients[@]}"; do
-        curl_args+=( --form "ingredients=${ing}" )
-    done
+    local payload=$1
 
     curl --location --request POST "${BASE_URL}/create" \
-        --form "name=${name}" \
-        --form "cost=${cost}" \
-        "${curl_args[@]}" \
+        --header "Content-Type: application/json" \
+        --data "${payload}" \
         --silent --show-error
 }
 
@@ -46,23 +37,14 @@ list_recipes() {
         --silent --show-error
 }
 
-# Function to update a recipe
+# Function to update a recipe (JSON)
 update_recipe() {
     local recipe_id=$1
-    local name=$2
-    local cost=$3
-    shift 3
-    local ingredients=("$@")
-    
-    local curl_args=()
-    for ing in "${ingredients[@]}"; do
-        curl_args+=( --form "ingredients=${ing}" )
-    done
+    local payload=$2
 
     curl --location --request PUT "${BASE_URL}/${recipe_id}" \
-        --form "name=${name}" \
-        --form "cost=${cost}" \
-        "${curl_args[@]}" \
+        --header "Content-Type: application/json" \
+        --data "${payload}" \
         --silent --show-error
 }
 
@@ -74,13 +56,27 @@ for i in $(seq 1 $NUM_REQUESTS); do
     RECIPE_ID=$((($i % 10) + 1))  # Cycle through recipe IDs 1-10
     NAME="Recipe-${RECIPE_ID}-v${i}"
     COST=$((10000 + ($i * 1500)))
-    INGREDIENTS=("ingredient-$((i % 5 + 1))" "ingredient-$((i % 7 + 1))" "ingredient-$((i % 11 + 1))")
+    INGREDIENTS_JSON=$(
+      cat <<EOF
+[
+  {"name":"ingredient-$((i % 5 + 1))","quantity":120,"measure":"g","unit":"box"},
+  {"name":"ingredient-$((i % 7 + 1))","quantity":1,"measure":"tbsp","unit":"spoon"},
+  {"name":"ingredient-$((i % 11 + 1))","quantity":250,"measure":"ml","unit":"cup"}
+]
+EOF
+    )
+
+    PAYLOAD=$(
+      cat <<EOF
+{"name":"${NAME}","ingredients":${INGREDIENTS_JSON},"cost":${COST}}
+EOF
+    )
     
     # Perform different operations based on request number
     case $((i % 4)) in
         0)
-            echo "Creating recipe: name=${NAME}, cost=${COST}, ingredients=${INGREDIENTS[*]}"
-            create_recipe "${NAME}" "${COST}" "${INGREDIENTS[@]}"
+            echo "Creating recipe: name=${NAME}, cost=${COST}"
+            create_recipe "${PAYLOAD}"
             ;;
         1)
             echo "Getting recipe with ID: $RECIPE_ID"
@@ -92,7 +88,7 @@ for i in $(seq 1 $NUM_REQUESTS); do
             ;;
         3)
             echo "Updating recipe ID: $RECIPE_ID with new cost: $COST"
-            update_recipe "$RECIPE_ID" "${NAME}" "${COST}" "${INGREDIENTS[@]}"
+            update_recipe "$RECIPE_ID" "${PAYLOAD}"
             ;;
     esac
     
